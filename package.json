@@ -1,0 +1,16 @@
+{
+  "name": "personal-knowledge-base",
+  "version": "1.0.0",
+  "description": "Simple wiki/notes app with AI-powered linking, tagging, and semantic search",
+  "private": true,
+  "workspaces": ["backend", "frontend"],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "test": "npm run test:backend"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
