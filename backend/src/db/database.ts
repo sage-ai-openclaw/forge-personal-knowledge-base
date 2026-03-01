@@ -97,9 +97,22 @@ async function createTables(): Promise<void> {
     )
   `);
 
+  // Embeddings table for semantic search
+  await database.exec(`
+    CREATE TABLE IF NOT EXISTS note_embeddings (
+      note_id INTEGER PRIMARY KEY,
+      embedding BLOB NOT NULL,
+      model TEXT DEFAULT 'nomic-embed-text',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE
+    )
+  `);
+
   // Indexes
   await database.exec(`CREATE INDEX IF NOT EXISTS idx_notes_title ON notes(title)`);
   await database.exec(`CREATE INDEX IF NOT EXISTS idx_notes_content ON notes(content)`);
   await database.exec(`CREATE INDEX IF NOT EXISTS idx_notes_updated ON notes(updated_at DESC)`);
   await database.exec(`CREATE INDEX IF NOT EXISTS idx_voice_notes_note_id ON voice_notes(note_id)`);
+  await database.exec(`CREATE INDEX IF NOT EXISTS idx_embeddings_note_id ON note_embeddings(note_id)`);
 }

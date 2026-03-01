@@ -3,6 +3,7 @@ import cors from 'cors';
 import { initializeDatabase } from './db/database';
 import notesRouter from './routes/notes';
 import voiceRouter from './routes/voice';
+import searchRouter from './routes/search';
 
 const app = express();
 const PORT = process.env.PORT || 5586;
@@ -12,6 +13,7 @@ app.use(express.json());
 
 app.use('/api', notesRouter);
 app.use('/api', voiceRouter);
+app.use('/api', searchRouter);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

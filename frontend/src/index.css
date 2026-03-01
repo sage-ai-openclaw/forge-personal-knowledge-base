@@ -793,3 +793,217 @@ body {
   background: #fee2e2;
   color: var(--danger);
 }
+
+/* ============================================
+   SEMANTIC SEARCH STYLES
+   ============================================ */
+
+.search-bar-container {
+  position: relative;
+}
+
+.search-toggle-button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.375rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  transition: all 0.2s;
+}
+
+.search-toggle-button:hover {
+  background: var(--bg);
+  border-color: var(--primary);
+  color: var(--text);
+}
+
+.shortcut-hint {
+  margin-left: 0.5rem;
+  padding: 0.125rem 0.375rem;
+  background: var(--border);
+  border-radius: 0.25rem;
+  font-size: 0.625rem;
+  font-family: inherit;
+}
+
+.search-modal {
+  position: fixed;
+  top: 20%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 600px;
+  max-width: 90vw;
+  background: var(--surface);
+  border-radius: 0.75rem;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.search-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.search-input-wrapper .search-icon {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.search-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 1rem;
+  color: var(--text);
+  background: transparent;
+}
+
+.search-input::placeholder {
+  color: var(--text-secondary);
+}
+
+.search-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+.search-close {
+  padding: 0.25rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  border-radius: 0.25rem;
+  transition: all 0.2s;
+}
+
+.search-close:hover {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.search-results {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.search-no-results {
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.search-no-results p:first-child {
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.search-hint {
+  font-size: 0.875rem;
+  font-style: italic;
+}
+
+.search-results-list {
+  list-style: none;
+}
+
+.search-result-item {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.search-result-item:last-child {
+  border-bottom: none;
+}
+
+.search-result-item:hover {
+  background: var(--bg);
+}
+
+.search-result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.search-result-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.search-result-score {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  font-weight: 600;
+}
+
+.search-result-score.high {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.search-result-score.medium {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.search-result-score.low {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.search-result-preview {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 0.5rem;
+}
+
+.search-result-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.search-result-tag {
+  font-size: 0.75rem;
+  padding: 0.125rem 0.375rem;
+  background: #ede9fe;
+  color: #6b21a8;
+  border-radius: 0.25rem;
+}
+
+/* Search bar wrapper in main content */
+.search-bar-wrapper {
+  padding: 0.75rem 1.5rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Overlay for search modal */
+.search-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.3);
+  z-index: 999;
+}

@@ -1,6 +1,7 @@
 import { getDatabase } from '../db/database';
-import type { Note, CreateNoteInput, UpdateNoteInput } from '../types';
+import type { Note, CreateNoteInput, UpdateNoteInput, SearchResult } from '../types';
 import { marked } from 'marked';
+import { EmbeddingService } from '../services/EmbeddingService';
 
 export class NoteModel {
   static async create(input: CreateNoteInput): Promise<Note> {
@@ -30,17 +31,24 @@ export class NoteModel {
       JSON.stringify(backlinks),
     ]);
 
+    const noteId = result.lastID!;
+
     // Save tags
     for (const tag of allTags) {
       await db.run(`INSERT OR IGNORE INTO tags (name) VALUES (?)`, tag);
       const tagRow = await db.get(`SELECT id FROM tags WHERE name = ?`, tag);
       if (tagRow) {
         await db.run(`INSERT OR IGNORE INTO note_tags (note_id, tag_id) VALUES (?, ?)`, 
-          result.lastID, tagRow.id);
+          noteId, tagRow.id);
       }
     }
 
-    return (await this.findById(result.lastID!))!;
+    // Generate and store embedding asynchronously (don't block on failure)
+    this.generateAndStoreEmbedding(noteId, input.title, input.content || '').catch(err => {
+      console.error('Failed to generate embedding for new note:', err);
+    });
+
+    return (await this.findById(noteId))!;
   }
 
   static async findById(id: number): Promise<Note | null> {
@@ -65,6 +73,72 @@ export class NoteModel {
       ORDER BY updated_at DESC
     `, searchTerm, searchTerm);
     return rows.map(row => this.mapRow(row));
+  }
+
+  /**
+   * Semantic search using embeddings and cosine similarity
+   */
+  static async semanticSearch(query: string, topK: number = 10): Promise<SearchResult[]> {
+    const db = await getDatabase();
+
+    // Generate embedding for the query
+    const queryEmbedding = await EmbeddingService.generateEmbedding(query);
+
+    // Get all notes with embeddings
+    const rows = await db.all(`
+      SELECT n.*, ne.embedding, ne.model
+      FROM notes n
+      JOIN note_embeddings ne ON n.id = ne.note_id
+    `);
+
+    if (rows.length === 0) {
+      return [];
+    }
+
+    // Calculate cosine similarity for each note
+    const results: SearchResult[] = rows.map(row => {
+      const noteEmbedding = EmbeddingService.bufferToEmbedding(row.embedding);
+      const similarity = EmbeddingService.cosineSimilarity(queryEmbedding, noteEmbedding);
+      
+      return {
+        note: this.mapRow(row),
+        similarity,
+      };
+    });
+
+    // Sort by similarity (highest first) and return top K
+    return results
+      .sort((a, b) => b.similarity - a.similarity)
+      .slice(0, topK);
+  }
+
+  /**
+   * Hybrid search: combine semantic and text search
+   */
+  static async hybridSearch(query: string, topK: number = 10): Promise<SearchResult[]> {
+    const db = await getDatabase();
+
+    // Try semantic search first
+    const semanticResults = await this.semanticSearch(query, topK * 2);
+
+    // Also do text search for fallback
+    const searchTerm = `%${query}%`;
+    const textRows = await db.all(`
+      SELECT * FROM notes 
+      WHERE title LIKE ? OR content LIKE ?
+      ORDER BY updated_at DESC
+    `, searchTerm, searchTerm);
+
+    // Combine results (semantic results take precedence)
+    const seenIds = new Set(semanticResults.map(r => r.note.id));
+    const textResults: SearchResult[] = textRows
+      .filter(row => !seenIds.has(row.id))
+      .map(row => ({
+        note: this.mapRow(row),
+        similarity: 0.5, // Default lower score for text matches
+      }));
+
+    return [...semanticResults, ...textResults].slice(0, topK);
   }
 
   static async findByTitle(title: string): Promise<Note | null> {
@@ -130,6 +204,12 @@ export class NoteModel {
             id, tagRow.id);
         }
       }
+
+      // Regenerate embedding
+      const newTitle = input.title !== undefined ? input.title : existing.title;
+      this.generateAndStoreEmbedding(id, newTitle, input.content).catch(err => {
+        console.error('Failed to regenerate embedding for updated note:', err);
+      });
     } else if (input.tags !== undefined) {
       updates.push('tags = ?');
       values.push(JSON.stringify(input.tags));
@@ -148,6 +228,60 @@ export class NoteModel {
     const db = await getDatabase();
     const result = await db.run('DELETE FROM notes WHERE id = ?', id);
     return result.changes! > 0;
+  }
+
+  /**
+   * Generate and store embedding for a note
+   */
+  private static async generateAndStoreEmbedding(
+    noteId: number, 
+    title: string, 
+    content: string
+  ): Promise<void> {
+    const db = await getDatabase();
+
+    // Combine title and content for embedding
+    const textToEmbed = `${title}\n\n${content}`.slice(0, 8000);
+
+    try {
+      const embedding = await EmbeddingService.generateEmbedding(textToEmbed);
+      const embeddingBuffer = EmbeddingService.embeddingToBuffer(embedding);
+
+      await db.run(`
+        INSERT INTO note_embeddings (note_id, embedding, model, updated_at)
+        VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(note_id) DO UPDATE SET
+          embedding = excluded.embedding,
+          model = excluded.model,
+          updated_at = CURRENT_TIMESTAMP
+      `, noteId, embeddingBuffer, 'nomic-embed-text');
+    } catch (error) {
+      console.error(`Failed to store embedding for note ${noteId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Regenerate embeddings for all notes (useful for migration)
+   */
+  static async regenerateAllEmbeddings(): Promise<{ processed: number; failed: number }> {
+    const db = await getDatabase();
+    const notes = await this.findAll();
+    
+    let processed = 0;
+    let failed = 0;
+
+    for (const note of notes) {
+      try {
+        await this.generateAndStoreEmbedding(note.id, note.title, note.content);
+        processed++;
+      } catch (error) {
+        console.error(`Failed to regenerate embedding for note ${note.id}:`, error);
+        failed++;
+      }
+    }
+
+    return { processed, failed };
   }
 
   private static extractTags(content: string): string[] {

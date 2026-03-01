@@ -36,3 +36,26 @@ export interface SaveNoteResponse {
   note: Note;
   suggestedTags?: string[];
 }
+
+export interface SearchResult {
+  note: Note;
+  similarity: number;
+}
+
+export interface NoteEmbedding {
+  noteId: number;
+  embedding: number[];
+  model: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SearchRequest {
+  query: string;
+  topK?: number;
+}
+
+export interface SearchResponse {
+  results: SearchResult[];
+  query: string;
+}

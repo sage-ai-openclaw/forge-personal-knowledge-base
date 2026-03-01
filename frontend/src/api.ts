@@ -1,4 +1,4 @@
-import type { Note, CreateNoteInput, UpdateNoteInput, SaveNoteResponse, VoiceNote } from './types';
+import type { Note, CreateNoteInput, UpdateNoteInput, SaveNoteResponse, VoiceNote, SearchResponse } from './types';
 
 const API_URL = '/api';
 
@@ -122,5 +122,38 @@ export function getVoiceNoteAudioUrl(voiceNoteId: number): string {
 export async function checkVoiceHealth(): Promise<{ whisperAvailable: boolean; error?: string }> {
   const res = await fetch(`${API_URL}/voice/health`);
   if (!res.ok) throw new Error('Failed to check voice health');
+  return res.json();
+}
+
+// Search API
+export interface SearchParams {
+  query: string;
+  topK?: number;
+  mode?: 'semantic' | 'text' | 'hybrid';
+}
+
+export async function searchNotes(params: SearchParams): Promise<{
+  results: { note: Note; similarity: number }[];
+  query: string;
+  mode: string;
+  count: number;
+}> {
+  const res = await fetch(`${API_URL}/search`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) throw new Error('Failed to search notes');
+  return res.json();
+}
+
+export async function checkSearchHealth(): Promise<{
+  status: string;
+  embeddingModel?: string;
+  embeddingDimension?: number;
+  error?: string;
+}> {
+  const res = await fetch(`${API_URL}/search/health`);
+  if (!res.ok) throw new Error('Failed to check search health');
   return res.json();
 }

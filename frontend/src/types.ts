@@ -37,3 +37,15 @@ export interface SaveNoteResponse {
   note: Note;
   suggestedTags?: string[];
 }
+
+export interface SearchResult {
+  note: Note;
+  similarity: number;
+}
+
+export interface SearchResponse {
+  results: SearchResult[];
+  query: string;
+  mode: string;
+  count: number;
+}
