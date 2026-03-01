@@ -1,8 +1,24 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import app from '../src/index';
 
+// Mock fetch for Ollama API
+const mockFetch = vi.fn();
+global.fetch = mockFetch as unknown as typeof fetch;
+
 describe('Notes API (US1)', () => {
+  beforeAll(() => {
+    // Mock Ollama to return empty suggestions for basic tests
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ response: '' })
+    });
+  });
+
+  afterAll(() => {
+    mockFetch.mockReset();
+  });
+
   describe('POST /api/notes', () => {
     it('should create a note with markdown content', async () => {
       const response = await request(app)
@@ -13,10 +29,10 @@ describe('Notes API (US1)', () => {
         });
 
       expect(response.status).toBe(201);
-      expect(response.body.title).toBe('My First Note');
-      expect(response.body.content).toBe('# Hello World\n\nThis is a test note.');
-      expect(response.body.htmlContent).toContain('<h1>');
-      expect(response.body.id).toBeDefined();
+      expect(response.body.note.title).toBe('My First Note');
+      expect(response.body.note.content).toBe('# Hello World\n\nThis is a test note.');
+      expect(response.body.note.htmlContent).toContain('<h1>');
+      expect(response.body.note.id).toBeDefined();
     });
 
     it('should extract tags from content', async () => {
@@ -28,8 +44,8 @@ describe('Notes API (US1)', () => {
         });
 
       expect(response.status).toBe(201);
-      expect(response.body.tags).toContain('ideas');
-      expect(response.body.tags).toContain('projects');
+      expect(response.body.note.tags).toContain('ideas');
+      expect(response.body.note.tags).toContain('projects');
     });
 
     it('should extract backlinks from content', async () => {
@@ -41,8 +57,8 @@ describe('Notes API (US1)', () => {
         });
 
       expect(response.status).toBe(201);
-      expect(response.body.backlinks).toContain('Related Note');
-      expect(response.body.backlinks).toContain('Another Note');
+      expect(response.body.note.backlinks).toContain('Related Note');
+      expect(response.body.note.backlinks).toContain('Another Note');
     });
 
     it('should reject empty title', async () => {
@@ -100,12 +116,12 @@ describe('Notes API (US1)', () => {
         .send({ title: 'Original', content: 'Original content' });
 
       const updateRes = await request(app)
-        .patch(`/api/notes/${createRes.body.id}`)
+        .patch(`/api/notes/${createRes.body.note.id}`)
         .send({ content: 'Updated content' });
 
       expect(updateRes.status).toBe(200);
-      expect(updateRes.body.content).toBe('Updated content');
-      expect(updateRes.body.htmlContent).toContain('Updated content');
+      expect(updateRes.body.note.content).toBe('Updated content');
+      expect(updateRes.body.note.htmlContent).toContain('Updated content');
     });
   });
 
@@ -115,10 +131,10 @@ describe('Notes API (US1)', () => {
         .post('/api/notes')
         .send({ title: 'To Delete', content: 'Content' });
 
-      const delRes = await request(app).delete(`/api/notes/${createRes.body.id}`);
+      const delRes = await request(app).delete(`/api/notes/${createRes.body.note.id}`);
       expect(delRes.status).toBe(204);
 
-      const getRes = await request(app).get(`/api/notes/${createRes.body.id}`);
+      const getRes = await request(app).get(`/api/notes/${createRes.body.note.id}`);
       expect(getRes.status).toBe(404);
     });
   });

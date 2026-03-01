@@ -26,12 +26,12 @@ function App() {
 
   const handleCreateNote = async () => {
     try {
-      const newNote = await createNote({
+      const response = await createNote({
         title: 'New Note',
         content: '',
       });
-      setNotes((prev) => [newNote, ...prev]);
-      setActiveNote(newNote);
+      setNotes((prev) => [response.note, ...prev]);
+      setActiveNote(response.note);
     } catch (err) {
       console.error('Failed to create note:', err);
     }

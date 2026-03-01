@@ -20,3 +20,8 @@ export interface UpdateNoteInput {
   content?: string;
   tags?: string[];
 }
+
+export interface SaveNoteResponse {
+  note: Note;
+  suggestedTags?: string[];
+}

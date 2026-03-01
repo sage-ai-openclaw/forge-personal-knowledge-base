@@ -1,9 +1,20 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import request from 'supertest';
 import app from '../src/index';
-import { NoteModel } from '../src/models/Note';
+
+// Mock fetch for Ollama API
+const mockFetch = vi.fn();
+global.fetch = mockFetch as unknown as typeof fetch;
 
 describe('Wiki Links (US2)', () => {
+  beforeEach(() => {
+    // Mock Ollama to return empty suggestions for these tests
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ response: '' })
+    });
+  });
+
   describe('GET /api/notes/:id/backlinks', () => {
     it('should return notes that link to the current note', async () => {
       // Create a target note
@@ -26,7 +37,7 @@ describe('Wiki Links (US2)', () => {
 
       // Get backlinks for target note
       const backlinksRes = await request(app)
-        .get(`/api/notes/${targetRes.body.id}/backlinks`);
+        .get(`/api/notes/${targetRes.body.note.id}/backlinks`);
       
       expect(backlinksRes.status).toBe(200);
       expect(backlinksRes.body).toHaveLength(1);
@@ -42,7 +53,7 @@ describe('Wiki Links (US2)', () => {
         });
 
       const backlinksRes = await request(app)
-        .get(`/api/notes/${noteRes.body.id}/backlinks`);
+        .get(`/api/notes/${noteRes.body.note.id}/backlinks`);
       
       expect(backlinksRes.status).toBe(200);
       expect(backlinksRes.body).toEqual([]);
@@ -68,7 +79,7 @@ describe('Wiki Links (US2)', () => {
       
       expect(findRes.status).toBe(200);
       expect(findRes.body.title).toBe('Unique Title');
-      expect(findRes.body.id).toBe(createRes.body.id);
+      expect(findRes.body.id).toBe(createRes.body.note.id);
     });
 
     it('should find note by title case-insensitively', async () => {
@@ -150,9 +161,9 @@ describe('Wiki Links (US2)', () => {
         });
 
       expect(res.status).toBe(201);
-      expect(res.body.htmlContent).toContain('wiki-link');
-      expect(res.body.htmlContent).toContain('href="/notes/Related%20Topic"');
-      expect(res.body.htmlContent).toContain('data-wiki-title="Related Topic"');
+      expect(res.body.note.htmlContent).toContain('wiki-link');
+      expect(res.body.note.htmlContent).toContain('href="/notes/Related%20Topic"');
+      expect(res.body.note.htmlContent).toContain('data-wiki-title="Related Topic"');
     });
 
     it('should convert multiple wiki links in content', async () => {
@@ -164,8 +175,8 @@ describe('Wiki Links (US2)', () => {
         });
 
       expect(res.status).toBe(201);
-      expect(res.body.htmlContent).toContain('href="/notes/First%20Link"');
-      expect(res.body.htmlContent).toContain('href="/notes/Second%20Link"');
+      expect(res.body.note.htmlContent).toContain('href="/notes/First%20Link"');
+      expect(res.body.note.htmlContent).toContain('href="/notes/Second%20Link"');
     });
 
     it('should update HTML when wiki links are modified', async () => {
@@ -177,12 +188,12 @@ describe('Wiki Links (US2)', () => {
         });
 
       const updateRes = await request(app)
-        .patch(`/api/notes/${createRes.body.id}`)
+        .patch(`/api/notes/${createRes.body.note.id}`)
         .send({ content: 'Now link to [[New Target]].' });
 
       expect(updateRes.status).toBe(200);
-      expect(updateRes.body.htmlContent).toContain('href="/notes/New%20Target"');
-      expect(updateRes.body.htmlContent).not.toContain('href="/notes/Old%20Target"');
+      expect(updateRes.body.note.htmlContent).toContain('href="/notes/New%20Target"');
+      expect(updateRes.body.note.htmlContent).not.toContain('href="/notes/Old%20Target"');
     });
   });
 
@@ -195,9 +206,9 @@ describe('Wiki Links (US2)', () => {
           content: 'Links to [[Note A]] and [[Note B]].',
         });
 
-      expect(res.body.backlinks).toContain('Note A');
-      expect(res.body.backlinks).toContain('Note B');
-      expect(res.body.backlinks).toHaveLength(2);
+      expect(res.body.note.backlinks).toContain('Note A');
+      expect(res.body.note.backlinks).toContain('Note B');
+      expect(res.body.note.backlinks).toHaveLength(2);
     });
 
     it('should update backlinks when content changes', async () => {
@@ -209,13 +220,13 @@ describe('Wiki Links (US2)', () => {
         });
 
       const updateRes = await request(app)
-        .patch(`/api/notes/${createRes.body.id}`)
+        .patch(`/api/notes/${createRes.body.note.id}`)
         .send({ content: 'Now [[Link A]] and [[Link B]].' });
 
-      expect(updateRes.body.backlinks).toContain('Link A');
-      expect(updateRes.body.backlinks).toContain('Link B');
-      expect(updateRes.body.backlinks).not.toContain('One Link');
-      expect(updateRes.body.backlinks).toHaveLength(2);
+      expect(updateRes.body.note.backlinks).toContain('Link A');
+      expect(updateRes.body.note.backlinks).toContain('Link B');
+      expect(updateRes.body.note.backlinks).not.toContain('One Link');
+      expect(updateRes.body.note.backlinks).toHaveLength(2);
     });
   });
 });

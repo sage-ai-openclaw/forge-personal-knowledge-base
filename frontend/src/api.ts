@@ -1,4 +1,4 @@
-import type { Note, CreateNoteInput, UpdateNoteInput } from './types';
+import type { Note, CreateNoteInput, UpdateNoteInput, SaveNoteResponse } from './types';
 
 const API_URL = '/api';
 
@@ -14,7 +14,7 @@ export async function fetchNote(id: number): Promise<Note> {
   return res.json();
 }
 
-export async function createNote(input: CreateNoteInput): Promise<Note> {
+export async function createNote(input: CreateNoteInput): Promise<SaveNoteResponse> {
   const res = await fetch(`${API_URL}/notes`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -24,7 +24,7 @@ export async function createNote(input: CreateNoteInput): Promise<Note> {
   return res.json();
 }
 
-export async function updateNote(id: number, input: UpdateNoteInput): Promise<Note> {
+export async function updateNote(id: number, input: UpdateNoteInput): Promise<SaveNoteResponse> {
   const res = await fetch(`${API_URL}/notes/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
@@ -61,5 +61,15 @@ export async function fetchNoteByTitle(title: string): Promise<Note | null> {
   const res = await fetch(`${API_URL}/notes/by-title/${encodeURIComponent(title)}`);
   if (res.status === 404) return null;
   if (!res.ok) throw new Error('Failed to fetch note by title');
+  return res.json();
+}
+
+export async function suggestTags(id: number, title: string, content: string, existingTags: string[] = []): Promise<{ suggestions: string[] }> {
+  const res = await fetch(`${API_URL}/notes/${id}/suggest-tags`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title, content, existingTags }),
+  });
+  if (!res.ok) throw new Error('Failed to suggest tags');
   return res.json();
 }

@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import type { Note } from '../types';
-import { fetchBacklinks, findOrCreateNote, deleteNote, updateNote } from '../api';
+import { fetchBacklinks, findOrCreateNote, deleteNote, updateNote, suggestTags } from '../api';
 
 interface NoteEditorProps {
   note: Note | null;
@@ -15,6 +15,9 @@ export function NoteEditor({ note, onNoteChange, onNoteDeleted }: NoteEditorProp
   const [htmlContent, setHtmlContent] = useState('');
   const [isDirty, setIsDirty] = useState(false);
   const [saveTimeout, setSaveTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
+  const [suggestedTags, setSuggestedTags] = useState<string[]>([]);
+  const [tags, setTags] = useState<string[]>([]);
+  const [isSuggesting, setIsSuggesting] = useState(false);
 
   // Load note data when note changes
   useEffect(() => {
@@ -22,6 +25,8 @@ export function NoteEditor({ note, onNoteChange, onNoteDeleted }: NoteEditorProp
       setTitle(note.title);
       setContent(note.content);
       setHtmlContent(note.htmlContent || '');
+      setTags(note.tags || []);
+      setSuggestedTags([]); // Clear suggestions when switching notes
       setIsDirty(false);
       loadBacklinks(note.id);
     }
@@ -41,13 +46,20 @@ export function NoteEditor({ note, onNoteChange, onNoteDeleted }: NoteEditorProp
     if (!note) return;
 
     try {
-      const updated = await updateNote(note.id, {
+      const response = await updateNote(note.id, {
         title: newTitle,
         content: newContent,
       });
-      setHtmlContent(updated.htmlContent || '');
-      onNoteChange(updated);
+      
+      setHtmlContent(response.note.htmlContent || '');
+      setTags(response.note.tags || []);
+      onNoteChange(response.note);
       setIsDirty(false);
+      
+      // Show AI suggested tags if available
+      if (response.suggestedTags && response.suggestedTags.length > 0) {
+        setSuggestedTags(response.suggestedTags);
+      }
       
       // Reload backlinks since they might have changed
       loadBacklinks(note.id);
@@ -103,6 +115,60 @@ export function NoteEditor({ note, onNoteChange, onNoteDeleted }: NoteEditorProp
     onNoteChange(backlinkNote);
   };
 
+  const handleAcceptTag = async (tag: string) => {
+    if (!note) return;
+    
+    const newTags = [...new Set([...tags, tag])];
+    setTags(newTags);
+    setSuggestedTags(prev => prev.filter(t => t !== tag));
+    
+    try {
+      const response = await updateNote(note.id, { tags: newTags });
+      onNoteChange(response.note);
+    } catch (err) {
+      console.error('Failed to add tag:', err);
+    }
+  };
+
+  const handleAcceptAllTags = async () => {
+    if (!note || suggestedTags.length === 0) return;
+    
+    const newTags = [...new Set([...tags, ...suggestedTags])];
+    setTags(newTags);
+    setSuggestedTags([]);
+    
+    try {
+      const response = await updateNote(note.id, { tags: newTags });
+      onNoteChange(response.note);
+    } catch (err) {
+      console.error('Failed to add tags:', err);
+    }
+  };
+
+  const handleRejectTag = (tag: string) => {
+    setSuggestedTags(prev => prev.filter(t => t !== tag));
+  };
+
+  const handleDismissAllSuggestions = () => {
+    setSuggestedTags([]);
+  };
+
+  const handleRequestSuggestions = async () => {
+    if (!note) return;
+    
+    setIsSuggesting(true);
+    try {
+      const result = await suggestTags(note.id, title, content, tags);
+      if (result.suggestions.length > 0) {
+        setSuggestedTags(result.suggestions);
+      }
+    } catch (err) {
+      console.error('Failed to get suggestions:', err);
+    } finally {
+      setIsSuggesting(false);
+    }
+  };
+
   if (!note) {
     return (
       <div className="main-content">
@@ -144,6 +210,94 @@ export function NoteEditor({ note, onNoteChange, onNoteDeleted }: NoteEditorProp
             dangerouslySetInnerHTML={{ __html: htmlContent || '<p>Preview will appear here...</p>' }}
           />
         </div>
+
+        {/* Tags Section */}
+        <div className="tags-section">
+          <div className="current-tags">
+            <h4>🏷️ Tags</h4>
+            {tags.length === 0 ? (
+              <span className="no-tags">No tags yet</span>
+            ) : (
+              <div className="tags-list">
+                {tags.map((tag) => (
+                  <span key={tag} className="tag">
+                    #{tag}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* AI Suggested Tags */}
+        {(suggestedTags.length > 0 || isSuggesting) && (
+          <div className="suggested-tags-section">
+            <div className="suggested-tags-header">
+              <h4>🤖 AI Suggested Tags</h4>
+              <div className="suggested-tags-actions">
+                {suggestedTags.length > 0 && (
+                  <>
+                    <button 
+                      className="accept-all-btn" 
+                      onClick={handleAcceptAllTags}
+                      title="Accept all suggestions"
+                    >
+                      Accept All
+                    </button>
+                    <button 
+                      className="dismiss-btn" 
+                      onClick={handleDismissAllSuggestions}
+                      title="Dismiss all suggestions"
+                    >
+                      ✕
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+            
+            {isSuggesting ? (
+              <div className="suggesting-indicator">Thinking... 🤔</div>
+            ) : (
+              <div className="suggested-tags-list">
+                {suggestedTags.map((tag) => (
+                  <div key={tag} className="suggested-tag-item">
+                    <span className="suggested-tag-name">#{tag}</span>
+                    <div className="suggested-tag-actions">
+                      <button 
+                        className="accept-tag-btn" 
+                        onClick={() => handleAcceptTag(tag)}
+                        title="Add this tag"
+                      >
+                        ✓
+                      </button>
+                      <button 
+                        className="reject-tag-btn" 
+                        onClick={() => handleRejectTag(tag)}
+                        title="Ignore this suggestion"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Manual suggest button when no suggestions */}
+        {suggestedTags.length === 0 && !isSuggesting && content.length > 20 && (
+          <div className="suggest-tags-action">
+            <button 
+              className="suggest-tags-btn" 
+              onClick={handleRequestSuggestions}
+              disabled={isSuggesting}
+            >
+              🤖 Suggest Tags
+            </button>
+          </div>
+        )}
 
         <div className="backlinks-section">
           <h3>🔗 Linked from ({backlinks.length})</h3>

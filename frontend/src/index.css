@@ -329,3 +329,184 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+
+/* Tags Section */
+.tags-section {
+  padding: 0.75rem 1.5rem;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+
+.current-tags h4 {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+}
+
+.no-tags {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.tags-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.tag {
+  padding: 0.25rem 0.5rem;
+  background: #dbeafe;
+  color: #1e40af;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+/* AI Suggested Tags */
+.suggested-tags-section {
+  padding: 0.75rem 1.5rem;
+  background: #fdf4ff;
+  border-top: 1px solid #f0abfc;
+}
+
+.suggested-tags-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.suggested-tags-header h4 {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #86198f;
+}
+
+.suggested-tags-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.accept-all-btn {
+  padding: 0.25rem 0.75rem;
+  background: #a855f7;
+  color: white;
+  border: none;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.accept-all-btn:hover {
+  background: #9333ea;
+}
+
+.dismiss-btn {
+  padding: 0.25rem 0.5rem;
+  background: transparent;
+  color: #86198f;
+  border: 1px solid #f0abfc;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.dismiss-btn:hover {
+  background: #f0abfc;
+}
+
+.suggesting-indicator {
+  font-size: 0.875rem;
+  color: #86198f;
+  font-style: italic;
+  padding: 0.5rem 0;
+}
+
+.suggested-tags-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.suggested-tag-item {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  background: white;
+  border: 1px dashed #c084fc;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+}
+
+.suggested-tag-name {
+  color: #7e22ce;
+  font-weight: 500;
+}
+
+.suggested-tag-actions {
+  display: flex;
+  gap: 0.125rem;
+}
+
+.accept-tag-btn,
+.reject-tag-btn {
+  padding: 0.125rem 0.25rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 0.75rem;
+  border-radius: 0.125rem;
+  transition: background 0.2s;
+}
+
+.accept-tag-btn {
+  color: #16a34a;
+}
+
+.accept-tag-btn:hover {
+  background: #dcfce7;
+}
+
+.reject-tag-btn {
+  color: #dc2626;
+}
+
+.reject-tag-btn:hover {
+  background: #fee2e2;
+}
+
+/* Manual suggest button */
+.suggest-tags-action {
+  padding: 0.75rem 1.5rem;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+
+.suggest-tags-btn {
+  padding: 0.5rem 1rem;
+  background: #f3e8ff;
+  color: #7e22ce;
+  border: 1px dashed #c084fc;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.suggest-tags-btn:hover:not(:disabled) {
+  background: #e9d5ff;
+  border-style: solid;
+}
+
+.suggest-tags-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
