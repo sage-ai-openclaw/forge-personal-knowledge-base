@@ -7,7 +7,10 @@ export class NoteModel {
     const db = await getDatabase();
     
     // Convert markdown to HTML
-    const htmlContent = await marked(input.content || '');
+    const rawHtmlContent = await marked(input.content || '');
+    
+    // Convert wiki links to clickable HTML links
+    const htmlContent = this.processWikiLinksToHtml(rawHtmlContent);
     
     // Extract tags from content (#tag)
     const extractedTags = this.extractTags(input.content);
@@ -64,6 +67,25 @@ export class NoteModel {
     return rows.map(row => this.mapRow(row));
   }
 
+  static async findByTitle(title: string): Promise<Note | null> {
+    const db = await getDatabase();
+    const row = await db.get('SELECT * FROM notes WHERE title = ? COLLATE NOCASE', title);
+    if (!row) return null;
+    return this.mapRow(row);
+  }
+
+  static async findBacklinks(noteTitle: string): Promise<Note[]> {
+    const db = await getDatabase();
+    const rows = await db.all(`
+      SELECT * FROM notes 
+      WHERE json_extract(backlinks, '$') LIKE ?
+      ORDER BY updated_at DESC
+    `, `%${noteTitle}%`);
+    return rows.map(row => this.mapRow(row)).filter(note => 
+      note.backlinks?.some(link => link.toLowerCase() === noteTitle.toLowerCase())
+    );
+  }
+
   static async update(id: number, input: UpdateNoteInput): Promise<Note | null> {
     const db = await getDatabase();
     
@@ -83,7 +105,9 @@ export class NoteModel {
       values.push(input.content);
       
       // Update HTML content
-      const htmlContent = await marked(input.content);
+      const rawHtmlContent = await marked(input.content);
+      // Convert wiki links to clickable HTML links
+      const htmlContent = this.processWikiLinksToHtml(rawHtmlContent);
       updates.push('html_content = ?');
       values.push(htmlContent);
       
@@ -144,6 +168,15 @@ export class NoteModel {
       links.push(match[1]);
     }
     return links;
+  }
+
+  private static processWikiLinksToHtml(html: string): string {
+    // Convert [[Note Title]] in the HTML to clickable links
+    // First, we need to handle any escaped versions that might appear
+    return html.replace(/\[\[([^\]]+)\]\]/g, (match, title) => {
+      const encodedTitle = encodeURIComponent(title);
+      return `<a href="/notes/${encodedTitle}" class="wiki-link" data-wiki-title="${title}">${title}</a>`;
+    });
   }
 
   private static mapRow(row: any): Note {
