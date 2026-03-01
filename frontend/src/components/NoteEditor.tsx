@@ -1,6 +1,7 @@
-import { useState, useCallback, useEffect } from 'react';
-import type { Note } from '../types';
-import { fetchBacklinks, findOrCreateNote, deleteNote, updateNote, suggestTags } from '../api';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import type { Note, VoiceNote } from '../types';
+import { fetchBacklinks, findOrCreateNote, deleteNote, updateNote, suggestTags, fetchVoiceNotes, getVoiceNoteAudioUrl, deleteVoiceNote } from '../api';
+import { VoiceRecorder } from './VoiceRecorder';
 
 interface NoteEditorProps {
   note: Note | null;
@@ -18,6 +19,10 @@ export function NoteEditor({ note, onNoteChange, onNoteDeleted }: NoteEditorProp
   const [suggestedTags, setSuggestedTags] = useState<string[]>([]);
   const [tags, setTags] = useState<string[]>([]);
   const [isSuggesting, setIsSuggesting] = useState(false);
+  const [voiceNotes, setVoiceNotes] = useState<VoiceNote[]>([]);
+  const [playingVoiceId, setPlayingVoiceId] = useState<number | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Load note data when note changes
   useEffect(() => {
@@ -29,6 +34,7 @@ export function NoteEditor({ note, onNoteChange, onNoteDeleted }: NoteEditorProp
       setSuggestedTags([]); // Clear suggestions when switching notes
       setIsDirty(false);
       loadBacklinks(note.id);
+      loadVoiceNotes(note.id);
     }
   }, [note?.id]);
 
@@ -38,6 +44,15 @@ export function NoteEditor({ note, onNoteChange, onNoteDeleted }: NoteEditorProp
       setBacklinks(bl);
     } catch (err) {
       console.error('Failed to load backlinks:', err);
+    }
+  };
+
+  const loadVoiceNotes = async (noteId: number) => {
+    try {
+      const vn = await fetchVoiceNotes(noteId);
+      setVoiceNotes(vn);
+    } catch (err) {
+      console.error('Failed to load voice notes:', err);
     }
   };
 
@@ -169,6 +184,113 @@ export function NoteEditor({ note, onNoteChange, onNoteDeleted }: NoteEditorProp
     }
   };
 
+  // Insert transcription at cursor position
+  const handleTranscription = (transcription: string) => {
+    const textarea = textareaRef.current;
+    if (!textarea) {
+      // Fallback: append to end
+      const newContent = content ? `${content}\n\n${transcription}` : transcription;
+      setContent(newContent);
+      setIsDirty(true);
+      saveNote(title, newContent);
+      return;
+    }
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    
+    // Determine if we need to add newlines
+    const before = content.substring(0, start);
+    const after = content.substring(end);
+    
+    // Add newlines if needed for clean insertion
+    let prefix = '';
+    let suffix = '';
+    
+    if (before.length > 0 && !before.endsWith('\n') && !before.endsWith(' ')) {
+      prefix = '\n\n';
+    } else if (before.length > 0 && before.endsWith('\n') && !before.endsWith('\n\n')) {
+      prefix = '\n';
+    }
+    
+    if (after.length > 0 && !after.startsWith('\n')) {
+      suffix = '\n\n';
+    }
+    
+    const newContent = before + prefix + transcription + suffix + after;
+    setContent(newContent);
+    setIsDirty(true);
+    
+    // Reset cursor position after insertion
+    const newCursorPosition = start + prefix.length + transcription.length;
+    
+    // Use setTimeout to set cursor position after React updates the textarea
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(newCursorPosition, newCursorPosition);
+    }, 0);
+    
+    // Trigger auto-save
+    if (saveTimeout) clearTimeout(saveTimeout);
+    setSaveTimeout(setTimeout(() => saveNote(title, newContent), 1000));
+  };
+
+  const handlePlayVoice = (voiceNoteId: number) => {
+    if (playingVoiceId === voiceNoteId) {
+      // Stop playing
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      setPlayingVoiceId(null);
+    } else {
+      // Start playing
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      
+      const audio = new Audio(getVoiceNoteAudioUrl(voiceNoteId));
+      audio.onended = () => setPlayingVoiceId(null);
+      audio.onerror = () => {
+        console.error('Failed to play audio');
+        setPlayingVoiceId(null);
+      };
+      
+      audio.play();
+      audioRef.current = audio;
+      setPlayingVoiceId(voiceNoteId);
+    }
+  };
+
+  const handleDeleteVoice = async (voiceNoteId: number) => {
+    if (!confirm('Are you sure you want to delete this voice recording?')) return;
+    
+    try {
+      await deleteVoiceNote(voiceNoteId);
+      setVoiceNotes(prev => prev.filter(vn => vn.id !== voiceNoteId));
+      
+      if (playingVoiceId === voiceNoteId && audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+        setPlayingVoiceId(null);
+      }
+    } catch (err) {
+      console.error('Failed to delete voice note:', err);
+    }
+  };
+
+  const formatDuration = (seconds?: number): string => {
+    if (!seconds) return '--:--';
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const formatDate = (dateStr: string): string => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
   if (!note) {
     return (
       <div className="main-content">
@@ -190,14 +312,25 @@ export function NoteEditor({ note, onNoteChange, onNoteDeleted }: NoteEditorProp
             onChange={handleTitleChange}
             placeholder="Note Title"
           />
-          {isDirty && <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>Unsaved</span>}
-          <button className="delete-btn" onClick={handleDelete}>
-            Delete
-          </button>
+          <div className="header-actions">
+            {isDirty && <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>Unsaved</span>}
+            
+            {/* Voice Recorder Button */}
+            <VoiceRecorder 
+              noteId={note.id} 
+              onTranscription={handleTranscription}
+              disabled={!note}
+            />
+            
+            <button className="delete-btn" onClick={handleDelete}>
+              Delete
+            </button>
+          </div>
         </div>
 
         <div className="editor-body">
           <textarea
+            ref={textareaRef}
             className="markdown-editor"
             value={content}
             onChange={handleContentChange}
@@ -210,6 +343,58 @@ export function NoteEditor({ note, onNoteChange, onNoteDeleted }: NoteEditorProp
             dangerouslySetInnerHTML={{ __html: htmlContent || '<p>Preview will appear here...</p>' }}
           />
         </div>
+
+        {/* Voice Notes Section */}
+        {voiceNotes.length > 0 && (
+          <div className="voice-notes-section">
+            <h4>🎙️ Voice Recordings ({voiceNotes.length})</h4>
+            <div className="voice-notes-list">
+              {voiceNotes.map((vn) => (
+                <div key={vn.id} className="voice-note-item">
+                  <button 
+                    className={`play-btn ${playingVoiceId === vn.id ? 'playing' : ''}`}
+                    onClick={() => handlePlayVoice(vn.id)}
+                    title={playingVoiceId === vn.id ? 'Pause' : 'Play'}
+                  >
+                    {playingVoiceId === vn.id ? (
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                        <rect x="6" y="4" width="4" height="16" />
+                        <rect x="14" y="4" width="4" height="16" />
+                      </svg>
+                    ) : (
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                        <path d="M8 5v14l11-7z" />
+                      </svg>
+                    )}
+                  </button>
+                  
+                  <div className="voice-note-info">
+                    <span className="voice-note-date">{formatDate(vn.createdAt)}</span>
+                    <span className="voice-note-duration">{formatDuration(vn.durationSeconds)}</span>
+                  </div>
+                  
+                  {vn.transcription && (
+                    <button 
+                      className="transcription-btn"
+                      onClick={() => handleTranscription(vn.transcription!)}
+                      title="Insert transcription"
+                    >
+                      📝
+                    </button>
+                  )}
+                  
+                  <button 
+                    className="delete-voice-btn"
+                    onClick={() => handleDeleteVoice(vn.id)}
+                    title="Delete recording"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Tags Section */}
         <div className="tags-section">

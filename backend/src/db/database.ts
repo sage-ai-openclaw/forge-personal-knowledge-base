@@ -81,8 +81,25 @@ async function createTables(): Promise<void> {
     )
   `);
 
+  // Voice notes table
+  await database.exec(`
+    CREATE TABLE IF NOT EXISTS voice_notes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      note_id INTEGER NOT NULL,
+      filename TEXT NOT NULL,
+      original_filename TEXT,
+      mime_type TEXT NOT NULL,
+      duration_seconds INTEGER,
+      transcription TEXT,
+      file_size_bytes INTEGER,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE
+    )
+  `);
+
   // Indexes
   await database.exec(`CREATE INDEX IF NOT EXISTS idx_notes_title ON notes(title)`);
   await database.exec(`CREATE INDEX IF NOT EXISTS idx_notes_content ON notes(content)`);
   await database.exec(`CREATE INDEX IF NOT EXISTS idx_notes_updated ON notes(updated_at DESC)`);
+  await database.exec(`CREATE INDEX IF NOT EXISTS idx_voice_notes_note_id ON voice_notes(note_id)`);
 }

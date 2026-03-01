@@ -9,6 +9,18 @@ export interface Note {
   updatedAt: string;
 }
 
+export interface VoiceNote {
+  id: number;
+  noteId: number;
+  filename: string;
+  originalFilename?: string;
+  mimeType: string;
+  durationSeconds?: number;
+  transcription?: string;
+  fileSizeBytes?: number;
+  createdAt: string;
+}
+
 export interface CreateNoteInput {
   title: string;
   content: string;

@@ -1,4 +1,4 @@
-import type { Note, CreateNoteInput, UpdateNoteInput, SaveNoteResponse } from './types';
+import type { Note, CreateNoteInput, UpdateNoteInput, SaveNoteResponse, VoiceNote } from './types';
 
 const API_URL = '/api';
 
@@ -71,5 +71,56 @@ export async function suggestTags(id: number, title: string, content: string, ex
     body: JSON.stringify({ title, content, existingTags }),
   });
   if (!res.ok) throw new Error('Failed to suggest tags');
+  return res.json();
+}
+
+// Voice notes API
+export async function fetchVoiceNotes(noteId: number): Promise<VoiceNote[]> {
+  const res = await fetch(`${API_URL}/notes/${noteId}/voice`);
+  if (!res.ok) throw new Error('Failed to fetch voice notes');
+  return res.json();
+}
+
+export async function uploadVoiceNote(
+  noteId: number, 
+  audioBlob: Blob, 
+  duration: number,
+  transcribe = true
+): Promise<{ voiceNote: VoiceNote; transcription?: string; transcribed: boolean }> {
+  const formData = new FormData();
+  formData.append('audio', audioBlob, `recording-${Date.now()}.webm`);
+  formData.append('duration', String(duration));
+  formData.append('transcribe', String(transcribe));
+
+  const res = await fetch(`${API_URL}/notes/${noteId}/voice`, {
+    method: 'POST',
+    body: formData,
+  });
+  if (!res.ok) throw new Error('Failed to upload voice note');
+  return res.json();
+}
+
+export async function transcribeVoiceNote(voiceNoteId: number): Promise<{ transcription: string }> {
+  const res = await fetch(`${API_URL}/voice/${voiceNoteId}/transcribe`, {
+    method: 'POST',
+  });
+  if (!res.ok) throw new Error('Failed to transcribe voice note');
+  return res.json();
+}
+
+export async function deleteVoiceNote(voiceNoteId: number): Promise<void> {
+  const res = await fetch(`${API_URL}/voice/${voiceNoteId}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) throw new Error('Failed to delete voice note');
+}
+
+export function getVoiceNoteAudioUrl(voiceNoteId: number): string {
+  return `${API_URL}/voice/${voiceNoteId}/audio`;
+}
+
+export async function checkVoiceHealth(): Promise<{ whisperAvailable: boolean; error?: string }> {
+  const res = await fetch(`${API_URL}/voice/health`);
+  if (!res.ok) throw new Error('Failed to check voice health');
   return res.json();
 }

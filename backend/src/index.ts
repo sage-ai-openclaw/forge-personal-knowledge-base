@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { initializeDatabase } from './db/database';
 import notesRouter from './routes/notes';
+import voiceRouter from './routes/voice';
 
 const app = express();
 const PORT = process.env.PORT || 5586;
@@ -10,6 +11,7 @@ app.use(cors());
 app.use(express.json());
 
 app.use('/api', notesRouter);
+app.use('/api', voiceRouter);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

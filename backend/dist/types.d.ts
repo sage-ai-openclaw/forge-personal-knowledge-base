@@ -24,4 +24,11 @@ export interface Tag {
     color?: string;
     createdAt: string;
 }
+export interface TagSuggestionResponse {
+    suggestions: string[];
+}
+export interface SaveNoteResponse {
+    note: Note;
+    suggestedTags?: string[];
+}
 //# sourceMappingURL=types.d.ts.map

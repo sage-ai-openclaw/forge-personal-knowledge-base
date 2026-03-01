@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const zod_1 = require("zod");
 const Note_1 = require("../models/Note");
+const TagSuggestionService_1 = require("../services/TagSuggestionService");
 const router = (0, express_1.Router)();
 const createNoteSchema = zod_1.z.object({
     title: zod_1.z.string().min(1).max(200),
@@ -41,6 +42,36 @@ router.get('/notes/:id/backlinks', async (req, res) => {
     }
     catch (error) {
         res.status(500).json({ error: 'Failed to fetch backlinks' });
+    }
+});
+// GET /api/notes/:id/suggest-tags - Get AI-suggested tags for a note
+router.get('/notes/:id/suggest-tags', async (req, res) => {
+    try {
+        const note = await Note_1.NoteModel.findById(Number(req.params.id));
+        if (!note) {
+            return res.status(404).json({ error: 'Note not found' });
+        }
+        const suggestions = await TagSuggestionService_1.TagSuggestionService.suggestTags(note.title, note.content, note.tags || []);
+        res.json(suggestions);
+    }
+    catch (error) {
+        console.error('Failed to suggest tags:', error);
+        res.status(500).json({ error: 'Failed to suggest tags' });
+    }
+});
+// POST /api/notes/:id/suggest-tags - Get AI-suggested tags for content (before save)
+router.post('/notes/:id/suggest-tags', async (req, res) => {
+    try {
+        const { title, content, existingTags } = req.body;
+        if (!content || typeof content !== 'string') {
+            return res.status(400).json({ error: 'Content is required' });
+        }
+        const suggestions = await TagSuggestionService_1.TagSuggestionService.suggestTags(title || '', content, existingTags || []);
+        res.json(suggestions);
+    }
+    catch (error) {
+        console.error('Failed to suggest tags:', error);
+        res.status(500).json({ error: 'Failed to suggest tags' });
     }
 });
 // GET /api/notes/by-title/:title - Get note by title
@@ -101,7 +132,7 @@ router.get('/notes/:id', async (req, res) => {
     try {
         const note = await Note_1.NoteModel.findById(Number(req.params.id));
         if (!note) {
-            return res.status(404).json({ error: 'Note not found' });
+            return res.status(404).json({ error: 'Not found' });
         }
         res.json(note);
     }
@@ -109,7 +140,7 @@ router.get('/notes/:id', async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch note' });
     }
 });
-// POST /api/notes - Create note
+// POST /api/notes - Create note with AI tag suggestions
 router.post('/notes', async (req, res) => {
     try {
         const result = createNoteSchema.safeParse(req.body);
@@ -117,26 +148,51 @@ router.post('/notes', async (req, res) => {
             return res.status(400).json({ error: 'Invalid input', details: result.error.issues });
         }
         const note = await Note_1.NoteModel.create(result.data);
-        res.status(201).json(note);
+        // Get AI tag suggestions for new notes
+        const { suggestions } = await TagSuggestionService_1.TagSuggestionService.suggestTags(note.title, note.content, note.tags || []);
+        res.status(201).json({
+            note,
+            suggestedTags: suggestions.length > 0 ? suggestions : undefined
+        });
     }
     catch (error) {
+        console.error('Failed to create note:', error);
         res.status(500).json({ error: 'Failed to create note' });
     }
 });
-// PATCH /api/notes/:id - Update note
+// PATCH /api/notes/:id - Update note with AI tag suggestions
 router.patch('/notes/:id', async (req, res) => {
     try {
         const result = updateNoteSchema.safeParse(req.body);
         if (!result.success) {
             return res.status(400).json({ error: 'Invalid input', details: result.error.issues });
         }
+        const existingNote = await Note_1.NoteModel.findById(Number(req.params.id));
+        if (!existingNote) {
+            return res.status(404).json({ error: 'Not found' });
+        }
+        // Check if content changed significantly
+        const contentChanged = result.data.content !== undefined &&
+            TagSuggestionService_1.TagSuggestionService.hasSignificantChange(existingNote.content, result.data.content);
         const note = await Note_1.NoteModel.update(Number(req.params.id), result.data);
         if (!note) {
-            return res.status(404).json({ error: 'Note not found' });
+            return res.status(404).json({ error: 'Not found' });
         }
-        res.json(note);
+        // Get AI tag suggestions if content changed significantly
+        let suggestedTags;
+        if (contentChanged) {
+            const { suggestions } = await TagSuggestionService_1.TagSuggestionService.suggestTags(note.title, note.content, note.tags || []);
+            if (suggestions.length > 0) {
+                suggestedTags = suggestions;
+            }
+        }
+        res.json({
+            note,
+            suggestedTags
+        });
     }
     catch (error) {
+        console.error('Failed to update note:', error);
         res.status(500).json({ error: 'Failed to update note' });
     }
 });
@@ -145,7 +201,7 @@ router.delete('/notes/:id', async (req, res) => {
     try {
         const success = await Note_1.NoteModel.delete(Number(req.params.id));
         if (!success) {
-            return res.status(404).json({ error: 'Note not found' });
+            return res.status(404).json({ error: 'Not found' });
         }
         res.status(204).send();
     }

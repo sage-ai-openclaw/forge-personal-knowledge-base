@@ -7,11 +7,13 @@ const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const database_1 = require("./db/database");
 const notes_1 = __importDefault(require("./routes/notes"));
+const voice_1 = __importDefault(require("./routes/voice"));
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 5586;
 app.use((0, cors_1.default)());
 app.use(express_1.default.json());
 app.use('/api', notes_1.default);
+app.use('/api', voice_1.default);
 app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
